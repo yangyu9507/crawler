@@ -1,0 +1,3 @@
+2019-10-08 14:29:26.530 [restartedMain] INFO  com.gy.Application - Starting Application on WIN-INCSSKBM0IF with PID 15448 (G:\Elasticsearch\analysis\hotwords\target\classes started by Administrator in G:\Elasticsearch\analysis\hotwords)
+2019-10-08 14:29:26.656 [restartedMain] INFO  com.gy.Application - No active profile set, falling back to default profiles: default
+2019-10-08 14:29:26.902 [restartedMain] INFO  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Refreshing org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext@1a222512: startup date [Tue Oct 08 14:29:26 CST 2019]; root of context hierarchy

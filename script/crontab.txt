@@ -1,0 +1,2 @@
+#********************HotWord Import Service***************************************
+*/1 * * * * sh /data/hotwords/hotwords-1.0-SNAPSHOT/bin/monitor.sh >> /data/hotwords/hotwords-1.0-SNAPSHOT/log/monitor.log 2>&1 &

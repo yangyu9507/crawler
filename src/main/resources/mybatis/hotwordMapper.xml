@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gy.dao.Hotword">
+
+    <resultMap id="resultMap" type="com.gy.entity.HotSearchInfo">
+        <result property="third_link" jdbcType="VARCHAR" column="third_link"/>
+        <result property="first_name" jdbcType="VARCHAR" column="first_name"/>
+        <result property="second_name" jdbcType="VARCHAR" column="second_name"/>
+        <result property="third_name" jdbcType="VARCHAR" column="third_name"/>
+        <result property="keyword" jdbcType="VARCHAR" column="keyword"/>
+    </resultMap>
+
+    <update id="dropTable" parameterType="java.lang.String" >
+        DROP TABLE IF EXISTS ${tableName}
+    </update>
+
+    <select id="isTableExist" parameterType="string" resultType="int">
+        select count(*) from information_schema.TABLES where table_name = #{tableName}
+    </select>
+
+
+    <update id="createTable" parameterType="java.lang.String">
+    CREATE TABLE ${tableName} (
+    `id` bigint(20) PRIMARY KEY AUTO_INCREMENT,
+    `create_date` datetime NOT NULL,
+    `third_link` varchar(500),
+    `first_name` varchar(500),
+    `second_name` varchar(500),
+    `third_name` varchar(500),
+    `keyword` varchar(500)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+    </update>
+
+    <update id="initId" parameterType="java.util.Map">
+        ALTER TABLE ${tableName} AUTO_INCREMENT= ${initId};
+    </update>
+
+    <insert id="insertHotWord" parameterType="com.gy.entity.HotSearchInfo">
+
+        INSERT INTO ${tableName}
+        (create_date,third_link,first_name,second_name,third_name,keyword)
+        VALUES(NOW(),#{info.third_link},#{info.first_name}
+            ,#{info.second_name},#{info.third_name},#{info.keyword})
+
+    </insert>
+
+
+
+</mapper>
