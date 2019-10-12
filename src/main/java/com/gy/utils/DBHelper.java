@@ -4,20 +4,15 @@ import com.gy.dao.Hotword;
 import com.gy.entity.HotSearchInfo;
 import com.gy.entity.ItemInfo;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.LocalDateTime;
+import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.annotation.Order;
-import org.springframework.core.io.support.PropertiesLoaderUtils;
 import org.springframework.stereotype.Service;
 
-import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
 
 /**
  * created by yangyu on 2019-09-27
@@ -27,14 +22,33 @@ public class DBHelper {
 
     private static final Logger logger = LoggerFactory.getLogger(DBHelper.class.getName());
 
-    public static String tableName;
-    public static String dropTableName;
-    public static boolean isDrop = false;
+    private static String tableName;
+    private static String dropTableName;
+    private static boolean isDrop = false;
 
     @Autowired
     private Hotword hotword;
 
+    /**
+     * <p>处理每天数据库的变更</p>
+     *
+     * @throws Exception
+     */
     public void dbChange() throws Exception{
+
+        String timeStr = DateTime.now().toString(DateTimeFormat.forPattern("yyyyMMdd"));
+        if (StringUtils.isNotBlank(DBHelper.tableName)) {
+            String dbStr = StringUtils.substring(DBHelper.tableName, 15);
+            if (!StringUtils.equalsIgnoreCase(timeStr,dbStr)){
+                DBHelper.isDrop = true;
+                DBHelper.dropTableName = DBHelper.tableName;
+                DBHelper.tableName = "hot_search_word" + timeStr;
+            }
+        } else {
+            DBHelper.isDrop = false;
+            DBHelper.tableName = "hot_search_word" + timeStr;
+        }
+
         if (isDrop) {
             createTable(tableName);
 

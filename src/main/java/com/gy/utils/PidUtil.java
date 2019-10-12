@@ -1,12 +1,20 @@
 package com.gy.utils;
 
+import com.google.common.collect.Lists;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.List;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
+ * <p>执行Linux系统命令</p>
+ *
  * created by yangyu on 2019-10-08
  */
 @Service
@@ -36,67 +44,40 @@ public class PidUtil {
     public void killNoGrepChromeDriver() throws Exception {
         String[] pidCmd = {"/bin/sh", "-c","ps -ef|grep chrome | grep -v grep | awk '{print $2}'"};
         String pid = cmdInvoke(pidCmd);
-        String[] killCmd = {"/bin/sh", "-c",String.format("kill -9 %s",pid.trim())};
+        String[] killCmd = {"/bin/sh", "-c",String.format("kill -9 %s",StringUtils.trim(pid))};
         cmdInvoke(killCmd);
     }
 
-    private java.util.List getAllPid(String[] cmd) throws Exception{
-        java.util.List pidList = new java.util.ArrayList<>();
+    private List getAllPid(String[] cmd) throws Exception{
+        List<String> pidList = Lists.newArrayList();
         Process p = Runtime.getRuntime().exec(cmd);
         int exec = p.waitFor();
         logger.info("PidUtil getAllPid 执行结果: {}" ,exec);
-        java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
+        BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
         String line = null;
         while ((line = br.readLine()) != null) {
-            pidList.add("kill -9 " + line.trim());
+            pidList.add("kill -9 " + StringUtils.trim(line));
         }
         return pidList;
     }
 
-    private String cmdInvoke(String cmd) {
-        StringBuffer cmdOut = new StringBuffer();
-        java.io.BufferedReader br = null;
-
-        try {
-            Process p = Runtime.getRuntime().exec(cmd);
-            int exec = p.waitFor();
-            logger.info("PidUtil cmdInvoke 执行结果: " + exec);
-            br = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
-            String line = null;
-            while ((line = br.readLine()) != null) {
-                cmdOut.append(line);
-            }
-        } catch (Exception e) {
-            logger.error("PidUtil cmdInvoke failed, cmd :" + cmd,e);
-        } finally {
-            if (br != null) {
-                try {
-                    br.close();
-                } catch (Exception e) {
-                    logger.error("PidUtil cmdInvoke BufferedReader close Failed : ",e);
-                }
-            }
-        }
-        return cmdOut.toString();
-    }
-
     private String cmdInvoke(String[] cmd) {
-        StringBuffer cmdOut = new StringBuffer();
-        java.io.BufferedReader br = null;
+        StringBuilder cmdOut = new StringBuilder();
+        BufferedReader br = null;
 
         try {
             Process p = Runtime.getRuntime().exec(cmd);
             int exec = p.waitFor();
-            logger.info("PidUtil cmdInvoke 执行结果: " + exec);
+            logger.info("PidUtil cmdInvoke 执行结果: {}", exec);
             br = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
             String line = null;
-            while ((line = br.readLine()) != null) {
+            while (Objects.nonNull(line = br.readLine())) {
                 cmdOut.append(line);
             }
         } catch (Exception e) {
            logger.error("PidUtil cmdInvoke failed, cmd :" + Arrays.toString(cmd),e);
         } finally {
-            if (br != null) {
+            if (Objects.nonNull(br)) {
                 try {
                     br.close();
                 } catch (Exception e) {
@@ -106,6 +87,4 @@ public class PidUtil {
         }
         return cmdOut.toString();
     }
-
-
 }

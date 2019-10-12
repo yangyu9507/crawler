@@ -3,10 +3,15 @@ package com.gy.service;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.regex.Matcher;
+import java.util.Objects;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.Properties;
+import java.util.Iterator;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ExecutorService;
 
 import com.gy.entity.HotSearchInfo;
 import com.gy.entity.ItemInfo;
@@ -17,8 +22,6 @@ import gy.lib.common.util.FinanceUtil;
 import gy.lib.common.util.NumberUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormat;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -33,27 +36,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
 
-import java.text.SimpleDateFormat;
-
 /**
  * created by yangyu on 2019-09-27
  */
 public class AliZhiShu implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(AliZhiShu.class);
-
-    //日期格式
-    private static SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    //PHANTOMJS驱动路劲
-    private static String PHANTOMJS_DRIVER = String.format("E:%sphantomjs%sphantomjs-2.1.1-windows%sbin%sphantomjs.exe",File.separator,File.separator,File.separator,File.separator);
-    //文件位置
-    private static String path = null;
-    //文件位置
-    private static String path2 = null;
-    private static WebDriver driver = null;
-    private static int companyNameNum = 0;
-    //谷歌驱动器
-    private static String CHROME_DRIVER = String.format("C:%sUsers%sAdministrator%sAppData%sLocal%sGoogle%sChrome%sApplication%schromedriver.exe",File.separator,File.separator,File.separator,File.separator,File.separator,File.separator,File.separator,File.separator);
 
     //爬虫时模拟的浏览器请求头
     private static String[] userAgent = {
@@ -99,62 +87,48 @@ public class AliZhiShu implements Runnable {
 
 
     static {
-        String CHROME_DRIVER = "";
+        /**
+         * 爬取之前,需要先下载对应系统的Chrome Driver
+         */
+        String chromeDriver = "";
         if (StringUtils.contains(StringUtils.lowerCase(System.getProperty("os.name")),"windows")){
-            CHROME_DRIVER = String.format("C:%sUsers%sAdministrator%sAppData%sLocal%sGoogle%sChrome%sApplication%schromedriver.exe"
+            chromeDriver = String.format("C:%sUsers%sAdministrator%sAppData%sLocal%sGoogle%sChrome%sApplication%schromedriver.exe"
             ,File.separator,File.separator,File.separator,File.separator,File.separator,File.separator,File.separator,File.separator);
         }else{
-            CHROME_DRIVER = String.format("%susr%sbin%schromedriver",File.separator,File.separator,File.separator);
+            chromeDriver = String.format("%susr%sbin%schromedriver",File.separator,File.separator,File.separator);
         }
-        System.setProperty("webdriver.chrome.driver", CHROME_DRIVER);
+        System.setProperty("webdriver.chrome.driver", chromeDriver);
     }
 
+    /**
+     * 在Spring中, 线程的run方法中不能使用自动注入的Bean, 因此采用这种方式
+     */
     private static DBHelper dbHelper = (DBHelper)SpringContextUtil.getBean(DBHelper.class);
     private static PidUtil pidUtil = (PidUtil)SpringContextUtil.getBean(PidUtil.class);
 
-    private void dealDB() {
-        String timeStr = DateTime.now().toString(DateTimeFormat.forPattern("yyyyMMdd"));
-        if (StringUtils.isNotBlank(DBHelper.tableName)) {
-            String dbStr = StringUtils.substring(DBHelper.tableName, 15);
-            if (!StringUtils.equalsIgnoreCase(timeStr,dbStr)){
-                DBHelper.isDrop = true;
-                DBHelper.dropTableName = DBHelper.tableName;
-                DBHelper.tableName = "hot_search_word" + timeStr;
-            }
-        } else {
-            DBHelper.isDrop = false;
-            DBHelper.tableName = "hot_search_word" + timeStr;
-        }
-    }
-
+    /**
+     * 爬取的总数量
+     */
     private static long totalCount = 0;
+
+    /**
+     * 执行爬虫任务的线程数
+     */
     private static int NUMBER_OF_PROCESSORS = Runtime.getRuntime().availableProcessors();
+
+    private static final boolean isNotWindows = !StringUtils.contains(StringUtils.lowerCase(System.getProperty("os.name")), "windows");
 
     @Override
     public void run() {
         try {
-
-            boolean isNotWindows = !StringUtils.contains(StringUtils.lowerCase(System.getProperty("os.name")), "windows");
-            if (isNotWindows){
-                NUMBER_OF_PROCESSORS = 10;
-                logger.info("开始清理Chrome...");
-                pidUtil.killChromeDriver();
-                waitTime(10000);
-                pidUtil.killNoGrepChromeDriver();
-                waitTime(10000);
-                logger.info("清理Chrome完成...");
-
-                logger.info("开始开启Chrome...");
-                pidUtil.startChrome();
-                logger.info("开启Chrome完成...");
-                waitTime(5000);
-            }
+            // 处理Chrome
+            dealChrome();
 
             logger.info("爬取1688网站热搜榜开始!  ");
             totalCount = 0;
             long start = System.currentTimeMillis();
-            dealDB();
 
+            // 处理每天数据库的变更
             dbHelper.dbChange();
 
             ExecutorService service = Executors.newFixedThreadPool(NUMBER_OF_PROCESSORS);
@@ -165,6 +139,7 @@ public class AliZhiShu implements Runnable {
 
             List<ChromeDriver> chromeDrivers = new ArrayList<>(NUMBER_OF_PROCESSORS);
             for (int i = 0 ; i < NUMBER_OF_PROCESSORS ; i++){
+                // 无界面运行Chrome, 去除addArguments后,每次都会打开Chrome
                 chromeDrivers.add(new ChromeDriver(new ChromeOptions().addArguments("--headless","--no-sandbox","--disable-gpu","--disable-dev-shm-usage")));
             }
 
@@ -172,9 +147,8 @@ public class AliZhiShu implements Runnable {
             Iterator<Object> iterator = urlKeySets.iterator();
             int i = 0;
             while (iterator.hasNext()){
-                Object next = iterator.next();
-                String key = String.valueOf(next);
-                if (StringUtils.isEmpty(key)) {
+                String key = String.valueOf(iterator.next());
+                if (StringUtils.isBlank(key)) {
                     continue;
                 }
                 String url =  String.valueOf(urlProperties.get(key));
@@ -184,8 +158,9 @@ public class AliZhiShu implements Runnable {
                 logger.info("开始爬取 {} : {} 的热搜词! ", key, url);
                 futureList.add(hotSearch);
                 i++;
+
+                //  每 NUMBER_OF_PROCESSORS 次 提交执行一次
                 if (i == NUMBER_OF_PROCESSORS){
-                    // 执行线程,结束后, 再完成初始化操作后,继续执行
                     logger.info("已经开启所有的子线程....");
                     for (int j = 0,len = futureList.size(); j < len; j++){
                         Object o = futureList.get(j).get();
@@ -213,8 +188,8 @@ public class AliZhiShu implements Runnable {
                 }
             }
 
+            // 处理 不够NUMBER_OF_PROCESSORS 数量的剩余任务
             if (i > 0) {
-                // 执行线程,结束后, 再完成初始化操作后,继续执行
                 logger.info("已经最后一次开启所有的子线程....");
                 for (int j = 0, len = futureList.size(); j < len; j++) {
                     Object o = futureList.get(j).get();
@@ -239,36 +214,16 @@ public class AliZhiShu implements Runnable {
             String time = getExecuteTime(start);
             logger.info("爬取1688网站热搜榜结束, 共有{}条数据, 耗时:{} ",totalCount,time);
 
-            if (isNotWindows) {
-                logger.info("开始最终关闭Chrome...");
-                pidUtil.killChromeDriver();
-                waitTime(5000);
-                pidUtil.killNoGrepChromeDriver();
-                logger.info("最终关闭Chrome完成...");
-            }
+            finalCloseChrome();
 
         } catch (Exception ex){
             logger.error("HotWordController get hot search word From1688 Failed: ",ex);
         }
     }
 
-    private void closeChrome(List<ChromeDriver> chromeDrivers) {
-        for (int k = 0, len = chromeDrivers.size(); k < len; k++) {
-            ChromeDriver chromeItem = chromeDrivers.get(k);
-            //关闭并退出浏览器
-            chromeItem.close();
-            chromeItem.quit();
-            // 等待Chrome关闭
-            waitTime(2000);
-        }
-        waitTime(2000);
-    }
-
     private void importHostWord(WebDriver webDriver, String firstUrl, String type) {
         String url = null;
         String urlWhole = null;
-        String category2 = null;
-        WebElement search = null;
         List<String> arr2 = new ArrayList<>();
         List<String> arrName2 = new ArrayList<>();
         List<String> arrName23 = new ArrayList<>();
@@ -325,11 +280,8 @@ public class AliZhiShu implements Runnable {
             webDriver.get(arr3.get(j));
             WebElement element = null;
             try {
-                int tried = 5;
-                while (tried > 0) {
-                    waitTime(200);
-                    tried--;
-                }
+                waitTime(1000);
+
                 element = webDriver.findElement(By.xpath(".//*/input[@value='month']"));
                 if (Objects.isNull(element)) {
                     continue;
@@ -338,23 +290,25 @@ public class AliZhiShu implements Runnable {
             } catch (Exception ex){
                 logger.error("Get hot search word from " + arr3.get(j) + " failed : ", ex);
             }
-            //爬虫
+            //爬取数据
             crawler(webDriver,firstName,arr3.get(j), arrName23.get(j), arrName3.get(j),type);
-            //wait
         }
     }
 
     /**
-     * 爬虫
+     * <p>爬取数据</p>
      *
+     * @param webDriver
+     * @param firstName
      * @param url
      * @param arrName2
      * @param arrName3
-     * @throws UnsupportedEncodingException
+     * @param type
      */
     private void crawler(WebDriver webDriver,String firstName,String url, String arrName2, String arrName3,String type) {
         Document docDetail = connect(webDriver,url);
         if (docDetail != null) {
+            // 热搜词获取
             if (StringUtils.equalsIgnoreCase("hot_search",type)){
 
                 List<WebElement> unitHots = webDriver.findElements(By.xpath(".//*/div[@class='unit hot']"));
@@ -366,14 +320,18 @@ public class AliZhiShu implements Runnable {
                     return;
                 }
 
+                // 只有一个tab的操作
                 insert(webDriver,firstName,url,arrName2,arrName3);
 
+                // 对多个tab的操作
                 List<WebElement> spans = paginations.get(0).findElements(By.tagName("span"));
                 for (int i = 1,len = spans.size() ; i < len; i++){
                      spans.get(i).click();
                     insert(webDriver,firstName,url,arrName2,arrName3);
                 }
             } else if (StringUtils.equalsIgnoreCase("product_ranking",type)){
+
+                // 产品排行获取
                 Elements elementEach = docDetail.select("div[class=unit hot unfolded]").select(".item.fd-clr");
                 for (int i = 0; i < elementEach.size(); i++) {
                     String elementUrl = elementEach.select("div[class=detail each]").select("p[class=title]").select("a").get(i).attr("href");
@@ -426,7 +384,13 @@ public class AliZhiShu implements Runnable {
         }
     }
 
-
+    /**
+     * <p>获取代表Html的Document</p>
+     *
+     * @param webDriver
+     * @param url
+     * @return
+     */
     private Document connect(WebDriver webDriver,String url) {
         if (StringUtils.isEmpty(url)) {
             return null;
@@ -438,11 +402,8 @@ public class AliZhiShu implements Runnable {
             //开始打开网页，等待输入元素出现
             /*WebDriverWait wait = new WebDriverWait(webDriver, 1);
             wait.until(ExpectedConditions.presenceOfElementLocated(By.name("keywords")));*/
-            int tried = 5;
-            while (tried > 0) {
-                waitTime(200);
-                tried--;
-            }
+
+            waitTime(1000);
             if (Objects.nonNull(webDriver)) {
                 doc = Jsoup.parse(webDriver.getPageSource());
             }
@@ -453,19 +414,24 @@ public class AliZhiShu implements Runnable {
     }
 
     /**
-     * 线程等待
+     * <p>线程等待,给Chrome操作预留时间</p>
+     *
      * @param time
      */
     private void waitTime(int time) {
         try {
             Thread.sleep(time);
         } catch (InterruptedException e) {
-            e.printStackTrace();
-            System.out.println("！进程被打断");
+            logger.error(Thread.currentThread().getName()+" 进程被打断 : ",e);
         }
     }
 
-    //写文件
+    /**
+     * <p>可以将获取的热搜词写入文件</p>
+     *
+     * @param content
+     * @param file
+     */
     private void exportFile(String content, File file) {
         try {
             if (Objects.isNull(file)){
@@ -494,6 +460,62 @@ public class AliZhiShu implements Runnable {
         }
     }
 
+
+    /**
+     * <p>Linux服务器上处理Chrome, windows图形化界面可自行关闭</p>
+     *
+     * @throws Exception
+     */
+    private void dealChrome() throws Exception{
+
+        if (!isNotWindows) return;
+
+        NUMBER_OF_PROCESSORS = 10;
+        logger.info("开始清理Chrome...");
+        pidUtil.killChromeDriver();
+        waitTime(10000);
+        pidUtil.killNoGrepChromeDriver();
+        waitTime(10000);
+        logger.info("清理Chrome完成...");
+
+        logger.info("开始开启Chrome...");
+        pidUtil.startChrome();
+        logger.info("开启Chrome完成...");
+        waitTime(5000);
+    }
+
+    /**
+     * <p>Linux服务器上处理Chrome, windows图形化界面可自行关闭</p>
+     *
+     * @throws Exception
+     */
+    private void finalCloseChrome() throws Exception {
+        if (!isNotWindows) return;
+
+        logger.info("开始最终关闭Chrome...");
+        pidUtil.killChromeDriver();
+        waitTime(5000);
+        pidUtil.killNoGrepChromeDriver();
+        logger.info("最终关闭Chrome完成...");
+    }
+
+    /**
+     * <p>线程池每 NUMBER_OF_PROCESSORS 次提高一次任务,执行完成后,要及时关闭Chrome进程, 防止占用过多的内存和CPU资源</p>
+     *
+     * @param chromeDrivers
+     */
+    private void closeChrome(List<ChromeDriver> chromeDrivers) {
+        for (int k = 0, len = chromeDrivers.size(); k < len; k++) {
+            ChromeDriver chromeItem = chromeDrivers.get(k);
+            //关闭并退出浏览器
+            chromeItem.close();
+            chromeItem.quit();
+            // 等待Chrome关闭
+            waitTime(2000);
+        }
+        waitTime(2000);
+    }
+
     /**
      * 计算执行时间
      *
@@ -505,7 +527,6 @@ public class AliZhiShu implements Runnable {
         int hour  = NumberUtil.toInt(Math.floor(totalTime / 3600));
         totalTime %= 3600;
         int min  = NumberUtil.toInt(Math.floor(totalTime / 60));
-
         String sec  = String.format("%.3f",totalTime % 60);
         return String.format("%dh %dm %ss",hour,min,sec);
     }

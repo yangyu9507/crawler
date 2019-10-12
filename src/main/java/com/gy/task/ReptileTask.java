@@ -1,13 +1,10 @@
 package com.gy.task;
 
 import com.gy.service.AliZhiShu;
-import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.annotation.Order;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -15,8 +12,6 @@ import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.scheduling.support.CronTrigger;
-import org.springframework.scheduling.support.PeriodicTrigger;
-import org.springframework.scheduling.support.SimpleTriggerContext;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -29,7 +24,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Configurable
 @Component
 @EnableScheduling
-//@Order(value = 3)
 public class ReptileTask implements SchedulingConfigurer {
 
     private static final Logger logger = LoggerFactory.getLogger(ReptileTask.class);

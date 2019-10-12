@@ -4,7 +4,6 @@ package com.gy.dao;
 import com.gy.entity.HotSearchInfo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.springframework.core.annotation.Order;
 
 import java.util.Map;
 

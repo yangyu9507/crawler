@@ -73,7 +73,6 @@ public class MySqlConfig {
     @Value(value = "${jdbc.filters}")
     private String filters;
 
-
     @Value(value = "${white.iplist}")
     private String whiteIpList;
 
