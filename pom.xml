@@ -42,7 +42,7 @@
         <maven-assembly-plugin.version>2.4.1</maven-assembly-plugin.version>
         <maven-surefire-plugin.version>2.19.1</maven-surefire-plugin.version>
 
-        <lib-common.version>2.0.46-perf</lib-common.version>
+        <lib-common.version>2.0.48-perf</lib-common.version>
     </properties>
 
     <parent>
