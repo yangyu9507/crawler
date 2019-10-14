@@ -123,14 +123,15 @@ public class AliZhiShu implements Runnable {
         try {
             // 处理Chrome
             dealChrome();
-
-            logger.info("爬取1688网站热搜榜开始!  ");
             totalCount = 0;
             long start = System.currentTimeMillis();
 
             // 处理每天数据库的变更
             dbHelper.dbChange();
 
+            waitTime(5000);
+
+            logger.info("爬取1688网站热搜榜开始!  ");
             ExecutorService service = Executors.newFixedThreadPool(NUMBER_OF_PROCESSORS);
 
             Properties urlProperties = PropertiesLoaderUtils.loadAllProperties("hot-search.properties");
@@ -215,7 +216,7 @@ public class AliZhiShu implements Runnable {
             logger.info("爬取1688网站热搜榜结束, 共有{}条数据, 耗时:{} ",totalCount,time);
 
             finalCloseChrome();
-
+            dbHelper.dropLastTable();
         } catch (Exception ex){
             logger.error("HotWordController get hot search word From1688 Failed: ",ex);
         }

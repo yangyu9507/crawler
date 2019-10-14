@@ -25,6 +25,7 @@ public class DBHelper {
     private static String tableName;
     private static String dropTableName;
     private static boolean isDrop = false;
+    private static final long initId = 1000000000L;
 
     @Autowired
     private Hotword hotword;
@@ -49,15 +50,13 @@ public class DBHelper {
             DBHelper.tableName = "hot_search_word" + timeStr;
         }
 
-        if (isDrop) {
-            createTable(tableName);
+        createTable(tableName);
+    }
 
-            if (StringUtils.isNotEmpty(dropTableName)) {
-                hotword.dropTable(dropTableName);
-                logger.info("Drop table {} finished !",dropTableName);
-            }
-        } else {
-            createTable(tableName);
+    public void dropLastTable(){
+        if (StringUtils.isNotEmpty(dropTableName)) {
+            hotword.dropTable(dropTableName);
+            logger.info("Drop table {} finished !",dropTableName);
         }
     }
 
@@ -69,16 +68,20 @@ public class DBHelper {
         int existResult = hotword.isTableExist(name);
 
         if (existResult > 0){
+            logger.info("Table {} has existed, no need create again! ",name);
             return;
         }
         hotword.createTable(name);
-        logger.info("Create table {}!",name);
+        logger.info("Create table {} finished !",name);
 
         Map<String,Object> map = new HashMap<>();
         map.put("tableName",name);
-        map.put("initId",1000000000);
+        map.put("initId",initId);
         hotword.initId(map);
+        logger.info("Init table {} with initId {} successfully! ",name,initId);
     }
+
+
 
     public <T>void insertMysql(T t) {
         try {
