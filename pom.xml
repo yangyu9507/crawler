@@ -26,7 +26,7 @@
         <bcel.version>6.0</bcel.version>
         <jsoup.version>1.12.1</jsoup.version>
         <springboot-mybatis.version>1.3.0</springboot-mybatis.version>
-        <junit.version>3.8.1</junit.version>
+        <junit.version>4.13.1</junit.version>
         <selenium-api.version>3.141.59</selenium-api.version>
         <webdriver-common.version>0.6.685</webdriver-common.version>
         <selenium.version>0.8.1</selenium.version>
